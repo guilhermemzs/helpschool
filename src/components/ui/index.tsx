@@ -164,7 +164,7 @@ export function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement
 }
 
 // ── Table ───────────────────────────────────────────────────────────────────
-export function Table({ children, className }: { children: React.ReactNode; className?: string }) {
+export function Table({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <div className={cn('bg-white border border-gray-200 rounded-xl overflow-hidden', className)}>
       <table className="w-full text-sm border-collapse">{children}</table>
