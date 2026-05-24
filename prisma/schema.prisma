@@ -1,0 +1,195 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  COORDINATOR
+  SECRETARY
+  TEACHER
+}
+
+enum ClassStatus {
+  ACTIVE
+  PAUSED
+  CANCELLED
+  FINISHED
+}
+
+enum TeacherType {
+  FIXED
+  FLEXIBLE
+}
+
+enum Modality {
+  ONLINE
+  PRESENCIAL
+  DOMICILIO
+  HIBRIDA
+}
+
+enum LessonStatus {
+  PENDING
+  CONFIRMED
+  RESCHEDULED
+  CANCELLED
+  COMPLETED
+}
+
+enum TestStatus {
+  FAZER
+  FAZENDO
+  ENTREGUE
+  CORRIGINDO
+}
+
+enum FlexibleStatus {
+  ACTIVE
+  WAITING
+  PAUSED
+  CANCELLED
+}
+
+model User {
+  id           String   @id @default(cuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         UserRole @default(SECRETARY)
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  auditLogs    AuditLog[]
+
+  @@map("users")
+}
+
+model Class {
+  id               String      @id @default(cuid())
+  code             String      @unique // "Class 1", "Class 80", etc.
+  studentNames     String
+  classType        String      // "Individual" | "Grupo"
+  level            String      // A1, A2, B1, B2, C1, C2, Kids, Teen, etc.
+  ageGroup         String?     // "17+", "11 - 16", "08 - 10", "4 -7"
+  allowedTeachers  String?     // Free text: "Todos", "menos William", "Só com Amanda"
+  teachingModality Modality    @default(ONLINE)
+  testStatus       TestStatus  @default(FAZER)
+  lessonsPerWeek   Int         @default(2)
+  notes            String?
+  status           ClassStatus @default(ACTIVE)
+  fixedDays        String?     // JSON array of weekdays
+  fixedTimes       String?     // JSON array of times
+  preferredTeacher String?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  lessons          Lesson[]
+  flexibleStudents FlexibleStudent[]
+
+  @@map("classes")
+}
+
+model Teacher {
+  id               String      @id @default(cuid())
+  name             String
+  type             TeacherType @default(FLEXIBLE)
+  modality         Modality    @default(ONLINE)
+  specialty        String?     // "Espanhol", etc.
+  needsConfirm     Boolean     @default(true)
+  notes            String?
+  active           Boolean     @default(true)
+  availability     TeacherAvailability[]
+  lessons          Lesson[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@map("teachers")
+}
+
+model TeacherAvailability {
+  id         String   @id @default(cuid())
+  teacherId  String
+  teacher    Teacher  @relation(fields: [teacherId], references: [id], onDelete: Cascade)
+  weekday    String   // "Monday", "Tuesday", etc.
+  startTime  String?  // "14:00"
+  endTime    String?  // "22:00"
+  modality   Modality?
+  notes      String?
+
+  @@map("teacher_availability")
+}
+
+model FlexibleStudent {
+  id               String         @id @default(cuid())
+  classId          String
+  class            Class          @relation(fields: [classId], references: [id])
+  studentName      String
+  lessonsPerWeek   Int            @default(1)
+  preferredModality Modality?
+  availability     String?
+  preferredTeacher String?
+  notes            String?
+  status           FlexibleStatus @default(ACTIVE)
+  lastLesson       DateTime?
+  nextLesson       DateTime?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+
+  @@map("flexible_students")
+}
+
+model Schedule {
+  id            String   @id @default(cuid())
+  weekStartDate DateTime
+  weekEndDate   DateTime
+  name          String   // "Semana 19/05 - 24/05"
+  lessons       Lesson[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@map("schedules")
+}
+
+model Lesson {
+  id          String       @id @default(cuid())
+  scheduleId  String?
+  schedule    Schedule?    @relation(fields: [scheduleId], references: [id])
+  classId     String
+  class       Class        @relation(fields: [classId], references: [id])
+  teacherId   String?
+  teacher     Teacher?     @relation(fields: [teacherId], references: [id])
+  date        DateTime
+  weekday     String       // "Segunda", "Terça", etc.
+  startTime   String       // "07:00"
+  endTime     String       // "08:00"
+  modality    Modality     @default(ONLINE)
+  level       String?
+  studentName String?
+  status      LessonStatus @default(PENDING)
+  notes       String?
+  needsConfirm Boolean     @default(false)
+  cancelReason String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@map("lessons")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  action     String   // "CREATE", "UPDATE", "DELETE"
+  entityType String   // "Class", "Lesson", "Teacher"
+  entityId   String
+  oldValue   Json?
+  newValue   Json?
+  createdAt  DateTime @default(now())
+
+  @@map("audit_logs")
+}
