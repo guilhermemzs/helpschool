@@ -98,7 +98,7 @@ export default function FlexibleStudentsPage() {
         <thead>
           <tr>
             <Th>Turma</Th><Th>Aluno</Th><Th>Aulas/sem</Th><Th>Modalidade</Th>
-            <Th>Última aula</Th><Th>Próxima aula</Th><Th>Obs</Th><Th>Status</Th><Th></Th>
+            <Th>Última aula</Th><Th>Próxima aula</Th><Th>Obs</Th><Th>Status</Th><Th>&nbsp;</Th>
           </tr>
         </thead>
         <tbody>

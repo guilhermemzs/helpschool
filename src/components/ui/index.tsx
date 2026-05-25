@@ -172,7 +172,7 @@ export function Table({ children, className }: { children?: React.ReactNode; cla
   )
 }
 
-export function Th({ children, className }: { children: React.ReactNode; className?: string }) {
+export function Th({ children, className }: { children?: React.ReactNode; className?: string }) {
   return (
     <th className={cn('bg-gray-50 px-3 py-2.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wide border-b border-gray-200', className)}>
       {children}
