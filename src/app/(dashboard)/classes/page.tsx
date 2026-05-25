@@ -131,7 +131,7 @@ export default function ClassesPage() {
           <tr>
             <Th>Turma</Th><Th>Aluno(s)</Th><Th>Tipo</Th><Th>Nível</Th>
             <Th>Modalidade</Th><Th>Professores</Th><Th>Prova</Th><Th>Aulas</Th>
-            <Th>Status</Th><Th>Obs</Th><Th></Th>
+            <Th>Status</Th><Th>Obs</Th><Th>&nbsp;</Th>
           </tr>
         </thead>
         <tbody>
