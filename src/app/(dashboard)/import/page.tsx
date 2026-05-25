@@ -60,7 +60,7 @@ export default function ImportPage() {
         <h1 className="text-xl font-bold text-gray-900">Importação de Planilhas</h1>
       </div>
 
-      <Alert type="info" className="mb-5">
+      <Alert type="info">
         <div className="text-sm">
           <p className="font-semibold mb-1">Planilhas suportadas:</p>
           <ul className="list-disc list-inside space-y-0.5 text-xs">
