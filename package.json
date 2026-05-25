@@ -1,6 +1,6 @@
 {
   "name": "helpschool",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
@@ -8,10 +8,8 @@
     "start": "next start",
     "lint": "next lint",
     "db:push": "prisma db push",
-    "db:migrate": "prisma migrate dev",
-    "db:studio": "prisma studio",
     "db:seed": "tsx prisma/seed.ts",
-    "db:reset": "prisma migrate reset --force && npm run db:seed"
+    "db:studio": "prisma studio"
   },
   "dependencies": {
     "next": "14.2.3",
@@ -20,30 +18,12 @@
     "@prisma/client": "^5.14.0",
     "next-auth": "^4.24.7",
     "bcryptjs": "^2.4.3",
-    "xlsx": "^0.18.5",
-    "jspdf": "^2.5.1",
-    "jspdf-autotable": "^3.8.2",
-    "@radix-ui/react-dialog": "^1.0.5",
-    "@radix-ui/react-dropdown-menu": "^2.0.6",
-    "@radix-ui/react-select": "^2.0.0",
-    "@radix-ui/react-tabs": "^1.0.4",
-    "@radix-ui/react-toast": "^1.1.5",
-    "@radix-ui/react-label": "^2.0.2",
-    "@radix-ui/react-switch": "^1.0.3",
-    "@radix-ui/react-separator": "^1.0.3",
-    "@radix-ui/react-alert-dialog": "^1.0.5",
-    "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
     "tailwind-merge": "^2.3.0",
     "lucide-react": "^0.383.0",
-    "date-fns": "^3.6.0",
-    "react-hook-form": "^7.51.5",
-    "@hookform/resolvers": "^3.4.2",
-    "zod": "^3.23.8",
     "sonner": "^1.4.41",
-    "react-dropzone": "^14.2.3",
-    "@tanstack/react-table": "^8.17.3",
-    "recharts": "^2.12.7"
+    "date-fns": "^3.6.0",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "typescript": "^5",

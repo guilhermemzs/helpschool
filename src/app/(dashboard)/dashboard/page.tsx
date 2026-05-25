@@ -1,177 +1,123 @@
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { StatCard, SectionHeader, Alert } from '@/components/ui'
-import { WEEKDAYS, CLASS_STATUS_LABELS, MODALITY_LABELS } from '@/lib/utils'
-import { AlertTriangle, Users, BookOpen, Clock, Calendar, TrendingUp } from 'lucide-react'
+import { StatCard } from '@/components/ui'
+import { getWeekdayFromDate, getWeekStart } from '@/lib/utils'
+import { AlertTriangle, BookOpen, Users, Calendar, Clock } from 'lucide-react'
 import Link from 'next/link'
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
+  const today = new Date()
+  const todayWeekday = getWeekdayFromDate(today)
+  const weekStart = getWeekStart(today)
+  const weekEnd = new Date(weekStart)
+  weekEnd.setDate(weekStart.getDate() + 6)
+
+  const todayStr = today.toISOString().split('T')[0]
 
   const [
-    totalClasses, activeClasses, pausedClasses,
-    totalTeachers, fixedTeachers,
-    totalFlexible, flexWithoutLesson,
-    latestSchedule,
-    classesByModality,
+    totalClasses, activeClasses, fixedClasses, flexClasses,
+    totalTeachers,
+    todayFixed, todayDaily,
+    flexPending,
   ] = await Promise.all([
     prisma.class.count(),
     prisma.class.count({ where: { status: 'ACTIVE' } }),
-    prisma.class.count({ where: { status: 'PAUSED' } }),
-    prisma.teacher.count({ where: { active: true } }),
-    prisma.teacher.count({ where: { active: true, type: 'FIXED' } }),
-    prisma.flexibleStudent.count({ where: { status: 'ACTIVE' } }),
-    prisma.flexibleStudent.count({ where: { status: 'ACTIVE', nextLesson: null } }),
-    prisma.schedule.findFirst({ orderBy: { weekStartDate: 'desc' }, include: { _count: { select: { lessons: true } } } }),
-    prisma.class.groupBy({ by: ['teachingModality'], _count: { id: true }, orderBy: { _count: { id: 'desc' } } }),
+    prisma.class.count({ where: { status: 'ACTIVE', classType: 'FIXED' } }),
+    prisma.class.count({ where: { status: 'ACTIVE', classType: 'FLEXIBLE' } }),
+    prisma.teacher.count({ where: { status: 'ACTIVE' } }),
+    prisma.fixedLesson.count({ where: { weekday: todayWeekday, active: true } }),
+    prisma.dailyLesson.findMany({
+      where: { date: { gte: new Date(todayStr), lt: new Date(new Date(todayStr).setDate(new Date(todayStr).getDate()+1)) } },
+      select: { status: true, modality: true, teacherId: true },
+    }),
+    prisma.class.findMany({
+      where: { status: 'ACTIVE', classType: 'FLEXIBLE' },
+      include: {
+        flexibleSchedules: {
+          where: { date: { gte: weekStart, lte: weekEnd } },
+          select: { id: true },
+        }
+      }
+    }),
   ])
 
-  let weekLessons: any[] = []
-  let dayStats: Record<string, any> = {}
-  let pendingLessons = 0
-  let noTeacher = 0
+  const confirmed  = todayDaily.filter(l => l.status === 'CONFIRMED').length
+  const cancelled  = todayDaily.filter(l => l.status === 'CANCELLED').length
+  const pending    = todayDaily.filter(l => l.status === 'PENDING').length
+  const online     = todayDaily.filter(l => l.modality === 'ONLINE').length
+  const presencial = todayDaily.filter(l => l.modality === 'PRESENCIAL').length
 
-  if (latestSchedule) {
-    weekLessons = await prisma.lesson.findMany({
-      where: { scheduleId: latestSchedule.id },
-      select: { weekday: true, status: true, modality: true, teacherId: true },
-    })
-    pendingLessons = weekLessons.filter(l => l.status === 'PENDING').length
-    noTeacher      = weekLessons.filter(l => !l.teacherId && l.status !== 'CANCELLED').length
-
-    for (const l of weekLessons) {
-      if (!dayStats[l.weekday]) dayStats[l.weekday] = { total: 0, confirmed: 0, pending: 0, online: 0, presencial: 0, domicilio: 0 }
-      dayStats[l.weekday].total++
-      if (l.status === 'CONFIRMED')    dayStats[l.weekday].confirmed++
-      if (l.status === 'PENDING')      dayStats[l.weekday].pending++
-      if (l.modality === 'ONLINE')     dayStats[l.weekday].online++
-      if (l.modality === 'PRESENCIAL') dayStats[l.weekday].presencial++
-      if (l.modality === 'DOMICILIO')  dayStats[l.weekday].domicilio++
-    }
-  }
+  const flexComplete = flexPending.filter(c => c.flexibleSchedules.length >= c.lessonsPerWeek).length
+  const flexMissing  = flexPending.filter(c => c.flexibleSchedules.length < c.lessonsPerWeek).length
 
   return (
     <div>
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-xl font-bold text-gray-900">Painel de Controle</h1>
-          <p className="text-sm text-gray-500 mt-0.5">Olá, {session?.user.name}. Bem-vindo ao sistema Help School.</p>
+          <h1 className="text-xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Olá, {session?.user.name}! Hoje é {todayWeekday}, {today.toLocaleDateString('pt-BR')}.</p>
         </div>
-        {latestSchedule && (
-          <span className="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1.5 rounded-full">
-            Semana ativa: {latestSchedule.name}
+        <Link href="/daily-schedule" className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white text-sm font-semibold rounded-xl transition-colors">
+          Abrir Escala de Hoje →
+        </Link>
+      </div>
+
+      {flexMissing > 0 && (
+        <div className="mb-5 p-4 bg-yellow-50 border border-yellow-200 rounded-xl flex items-center gap-3 text-sm text-yellow-800">
+          <AlertTriangle className="w-5 h-5 flex-shrink-0" />
+          <span><strong>{flexMissing} turma(s) flexível(is)</strong> ainda não completou as aulas desta semana.{' '}
+            <Link href="/flexible-calendar" className="underline font-semibold">Agendar agora</Link>
           </span>
-        )}
-      </div>
-
-      {/* Alerts */}
-      <div className="space-y-2 mb-6">
-        {pendingLessons > 0 && (
-          <Alert type="warning">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span><strong>{pendingLessons} aulas pendentes</strong> de confirmação esta semana.{' '}
-              <Link href="/schedule" className="underline font-semibold">Ver escala</Link>
-            </span>
-          </Alert>
-        )}
-        {noTeacher > 0 && (
-          <Alert type="error">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span><strong>{noTeacher} aulas sem professor</strong> — verifique a escala.{' '}
-              <Link href="/schedule" className="underline font-semibold">Ver escala</Link>
-            </span>
-          </Alert>
-        )}
-        {flexWithoutLesson > 0 && (
-          <Alert type="info">
-            <Clock className="w-4 h-4 flex-shrink-0 mt-0.5" />
-            <span><strong>{flexWithoutLesson} alunos flexíveis</strong> sem próxima aula marcada.{' '}
-              <Link href="/flexible-students" className="underline font-semibold">Ver flexíveis</Link>
-            </span>
-          </Alert>
-        )}
-      </div>
-
-      {/* Top stats */}
-      <SectionHeader title="Visão Geral" />
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        <StatCard label="Total de Turmas" value={totalClasses} sub={`${activeClasses} ativas · ${pausedClasses} pausadas`} accent="border-l-red-500" />
-        <StatCard label="Aulas na Semana" value={weekLessons.length} sub={`${pendingLessons} pendentes`} accent="border-l-yellow-400" />
-        <StatCard label="Professores" value={totalTeachers} sub={`${fixedTeachers} fixos · ${totalTeachers - fixedTeachers} flexíveis`} accent="border-l-blue-400" />
-        <StatCard label="Flexíveis" value={totalFlexible} sub={`${flexWithoutLesson} sem aula marcada`} accent="border-l-purple-400" />
-      </div>
-
-      {/* Modality breakdown */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {classesByModality.map(m => (
-          <StatCard
-            key={m.teachingModality}
-            label={MODALITY_LABELS[m.teachingModality] || m.teachingModality}
-            value={m._count.id}
-            sub="turmas"
-          />
-        ))}
-      </div>
-
-      {/* Week table */}
-      {latestSchedule && (
-        <>
-          <SectionHeader title={`Aulas por dia — ${latestSchedule.name}`}>
-            <Link href="/schedule" className="text-xs font-semibold text-red-600 hover:text-red-700">
-              Ver escala completa →
-            </Link>
-          </SectionHeader>
-          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden mb-6">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left px-4 py-2.5 text-xs font-bold text-gray-500 uppercase tracking-wide">Dia</th>
-                  <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Total</th>
-                  <th className="text-center px-3 py-2.5 text-xs font-bold text-green-600 uppercase">Confirm.</th>
-                  <th className="text-center px-3 py-2.5 text-xs font-bold text-yellow-600 uppercase">Pendentes</th>
-                  <th className="text-center px-3 py-2.5 text-xs font-bold text-gray-500 uppercase">Online</th>
-                  <th className="text-center px-3 py-2.5 text-xs font-bold text-red-600 uppercase">Presencial</th>
-                </tr>
-              </thead>
-              <tbody>
-                {WEEKDAYS.map(day => {
-                  const d = dayStats[day]
-                  return (
-                    <tr key={day} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
-                      <td className="px-4 py-2.5 font-semibold text-gray-900">{day}</td>
-                      <td className="px-3 py-2.5 text-center font-bold">{d?.total || 0}</td>
-                      <td className="px-3 py-2.5 text-center text-green-700 font-semibold">{d?.confirmed || 0}</td>
-                      <td className="px-3 py-2.5 text-center text-yellow-700 font-semibold">{d?.pending || 0}</td>
-                      <td className="px-3 py-2.5 text-center text-gray-600">{d?.online || 0}</td>
-                      <td className="px-3 py-2.5 text-center text-red-600">{d?.presencial || 0}</td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </>
+        </div>
       )}
 
-      {/* Quick actions */}
-      <SectionHeader title="Ações Rápidas" />
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Turmas</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <StatCard label="Total de turmas" value={totalClasses} />
+        <StatCard label="Ativas" value={activeClasses} accent="border-l-green-400" />
+        <StatCard label="Fixas ativas" value={fixedClasses} accent="border-l-blue-400" />
+        <StatCard label="Flexíveis ativas" value={flexClasses} accent="border-l-purple-400" />
+      </div>
+
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Hoje — {todayWeekday}</p>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+        <StatCard label="Aulas fixas" value={todayFixed} sub="na grade" />
+        <StatCard label="Na escala hoje" value={todayDaily.length} />
+        <StatCard label="Confirmadas" value={confirmed} accent="border-l-green-400" color="text-green-700" />
+        <StatCard label="Pendentes" value={pending} accent="border-l-yellow-400" color="text-yellow-700" />
+        <StatCard label="Canceladas" value={cancelled} accent="border-l-gray-400" color="text-gray-500" />
+        <StatCard label="Online" value={online} />
+        <StatCard label="Presencial" value={presencial} accent="border-l-red-400" />
+        <StatCard label="Professores ativos" value={totalTeachers} />
+      </div>
+
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Flexíveis — semana atual</p>
+      <div className="grid grid-cols-2 gap-3 mb-6 max-w-sm">
+        <StatCard label="Semana completa" value={flexComplete} accent="border-l-green-400" color="text-green-700" />
+        <StatCard label="Aulas faltando" value={flexMissing} accent="border-l-red-400" color="text-red-700" />
+      </div>
+
+      <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-3">Ações rápidas</p>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {[
-          { href: '/daily',             label: 'Ver escala de hoje',      icon: <Calendar className="w-5 h-5" />,    color: 'text-blue-600 bg-blue-50' },
-          { href: '/print',             label: 'Gerar resumo WhatsApp',   icon: <TrendingUp className="w-5 h-5" />,  color: 'text-green-600 bg-green-50' },
-          { href: '/flexible-students', label: 'Alunos sem aula',         icon: <Clock className="w-5 h-5" />,       color: 'text-yellow-600 bg-yellow-50' },
-          { href: '/classes',           label: 'Cadastrar turma',         icon: <BookOpen className="w-5 h-5" />,    color: 'text-purple-600 bg-purple-50' },
-        ].map(action => (
-          <Link
-            key={action.href} href={action.href}
-            className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow group"
-          >
-            <div className={`p-2 rounded-lg ${action.color}`}>{action.icon}</div>
-            <span className="text-sm font-semibold text-gray-700 group-hover:text-gray-900">{action.label}</span>
+          { href: '/daily-schedule', label: 'Escala diária', icon: <CalendarDays />, color: 'text-blue-600 bg-blue-50' },
+          { href: '/flexible-calendar', label: 'Agendar flexíveis', icon: <Clock />, color: 'text-purple-600 bg-purple-50' },
+          { href: '/classes', label: 'Turmas', icon: <BookOpen />, color: 'text-green-600 bg-green-50' },
+          { href: '/print', label: 'Impressão', icon: <Users />, color: 'text-orange-600 bg-orange-50' },
+        ].map(a => (
+          <Link key={a.href} href={a.href} className="bg-white border border-gray-200 rounded-xl p-4 flex items-center gap-3 hover:shadow-sm transition-shadow">
+            <div className={`p-2 rounded-lg ${a.color}`}>{a.icon}</div>
+            <span className="text-sm font-semibold text-gray-700">{a.label}</span>
           </Link>
         ))}
       </div>
     </div>
   )
 }
+
+function CalendarDays() { return <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg> }
+function Clock() { return <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> }
+function BookOpen() { return <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg> }
+function Users() { return <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg> }

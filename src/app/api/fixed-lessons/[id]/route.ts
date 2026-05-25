@@ -7,13 +7,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const body = await req.json()
-  const cls = await prisma.class.update({ where: { id: params.id }, data: body })
-  return NextResponse.json(cls)
+  const lesson = await prisma.fixedLesson.update({ where: { id: params.id }, data: body, include: { class: true } })
+  return NextResponse.json(lesson)
 }
 
 export async function DELETE(_: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  await prisma.class.delete({ where: { id: params.id } })
+  await prisma.fixedLesson.delete({ where: { id: params.id } })
   return NextResponse.json({ ok: true })
 }
