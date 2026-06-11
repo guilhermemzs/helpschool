@@ -112,16 +112,6 @@ Você verá algo como:
 npm run db:seed
 ```
 
-Você verá:
-
-```
-🌱 Seeding database...
-✅ Seed complete!
-   Users:    admin@helpschool.com / admin123
-             coord@helpschool.com / coord123
-             secretaria@helpschool.com / sec123
-```
-
 ### 6. Inicie o servidor de desenvolvimento
 
 ```bash
