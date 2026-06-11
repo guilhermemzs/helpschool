@@ -132,18 +132,6 @@ Acesse: **http://localhost:3000**
 
 ---
 
-## Credenciais de Acesso
-
-| Usuário | E-mail | Senha | Perfil |
-|---------|--------|-------|--------|
-| Administrador | admin@helpschool.com | admin123 | Acesso total |
-| Coordenação | coord@helpschool.com | coord123 | CRUD completo |
-| Secretaria | secretaria@helpschool.com | sec123 | Visualizar e editar |
-
-> ⚠️ **Troque as senhas** após o primeiro acesso usando a página de Usuários.
-
----
-
 ## Funcionalidades
 
 ### Dashboard
